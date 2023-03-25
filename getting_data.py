@@ -1,11 +1,17 @@
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+import torch.optim as optim
+from torch.utils.data import Dataset, DataLoader
+from torchvision import transforms
+
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import math
-from torch.utils.data import Dataset, DataLoader
-import torch
 
 
-def get_ordered_index(df, period_to_skip=31, val_pct=0.2, period_from_end_skip=0):
+def get_ordered_index(df, period_to_skip=31, val_pct=0.2, val_period=None, period_from_end_skip=0):
     """
     Get ordered index split into training and validation
     
@@ -18,11 +24,15 @@ def get_ordered_index(df, period_to_skip=31, val_pct=0.2, period_from_end_skip=0
     """
     # get ordered index split into training and validation
     all_dates = list(df.index)
-    train = int(len(all_dates)*(1-val_pct))
-
-    train_dates = all_dates[period_to_skip:train]
-    val_dates = all_dates[train:]
-    return train_dates, val_dates
+    length = df.index[-1]
+    if val_period is None:
+        val_period = int(length*val_pct)
+    
+    val_period = length-val_period
+    
+    train_index = all_dates[period_to_skip:val_period]
+    val_index = all_dates[val_period:]
+    return train_index, val_index
 
 def get_x(df, y_index, x_col = 'pct', period=3):
     """
@@ -30,7 +40,7 @@ def get_x(df, y_index, x_col = 'pct', period=3):
     """
     return df.loc[y_index-period:y_index-1, x_col]
 
-def get_xy(df, period, x_col = ['pct'], y_col='pct', val_pct=0.2):
+def get_xy(df, period, x_col = ['pct'], y_col='pct', val_pct=0.2, val_period=None, period_to_skip=None):
     """
     return training and validation data and y_pred
     
@@ -38,8 +48,9 @@ def get_xy(df, period, x_col = ['pct'], y_col='pct', val_pct=0.2):
     x_col: all columns of potential features
     
     """
+    period_to_skip = period_to_skip if period_to_skip!=None else period+1
     
-    train_index, val_index = get_ordered_index(df, period_to_skip=period+1, val_pct=0.2)
+    train_index, val_index = get_ordered_index(df, period_to_skip=period_to_skip, val_pct=val_pct, val_period=val_period)
 
     y_train = np.array(df.loc[train_index, y_col])
     y_val = np.array(df.loc[val_index, y_col])
@@ -67,8 +78,8 @@ class CustomDataset(Dataset):
     Custom dataset for pytorch
     """
     
-    def __init__(self, X, y, x_transform=None, target_transform=None):
-        self.X = X
+    def __init__(self, Xs, y, x_transform=None, target_transform=None):
+        self.Xs = Xs
         self.y = y
         self.x_transform = x_transform
         self.target_transform = target_transform
@@ -77,10 +88,7 @@ class CustomDataset(Dataset):
         return self.y.shape[0]
 
     def __getitem__(self, idx):
-        x = self.X[idx].type(torch.float)
+        Xs = (self.Xs[i][idx].type(torch.float) for i in range(len(self.Xs)))
         y = self.y[idx].type(torch.float)
-        if self.x_transform:
-            x = self.x_transform(x)
-        if self.target_transform:
-            y = self.target_transform(y)
-        return x, y
+
+        return *Xs, y

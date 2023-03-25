@@ -31,9 +31,11 @@ def train_loop(dataloader, model, loss_fn, optimizer):
     total_loss = 0
     model.train(True)
     
-    for batch, (X, y) in enumerate(dataloader):
+    for batch, tup in enumerate(dataloader):
         
-        pred = model(X)
+        X = tup[:-1]
+        y = tup[-1]
+        pred = model(*X)
         loss = loss_fn(pred, y)
         
         total_loss += loss
@@ -58,8 +60,10 @@ def test_loop(dataloader, model, loss_fn, batch_size, threshold=0.5):
     test_loss, correct, tot = 0, 0, 0
 
     with torch.no_grad():
-        for X, y in dataloader:
-            pred = model(X)
+        for tup in dataloader:
+            X = tup[:-1]
+            y = tup[-1]
+            pred = model(*X)
             test_loss += loss_fn(pred, y).item()
             pred = (torch.sigmoid(pred) > threshold).type(torch.float32)
             correct += (pred==y).sum().item()
@@ -69,7 +73,6 @@ def test_loop(dataloader, model, loss_fn, batch_size, threshold=0.5):
     correct /= tot
     print(f"Avg val loss: {test_loss:>8f}, Validation accuracy: {(100*correct):>0.1f}% \n")
     return test_loss, correct
-
 
 class basic_indicator_cnn(nn.Module):
     def __init__(self):

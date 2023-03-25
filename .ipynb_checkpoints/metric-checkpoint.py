@@ -32,9 +32,9 @@ class anlayse_binary():
         cf = confusion_matrix(self.y_true, self.y_pred, labels = [0,1], normalize='true')
         ConfusionMatrixDisplay(cf).plot()
         plt.show()
-        print(classification_report(y_val, y_pred_binary))
+        print(classification_report(self.y_true, self.y_pred))
     
-    def threshold_range(self, start=0.5, end=0.6, bins=10):
+    def threshold_range(self, start=0.5, end=0.6, bins=10, return_ = False):
         dif = (end-start)/bins
         range_x = [start + dif*i for i in range(bins)]
         precision = []
@@ -54,13 +54,15 @@ class anlayse_binary():
         self.thresholds_range_x = range_x
         self.thresholds_range = thresholds_range
         
-        return thresholds_range
+        if return_:
+            return thresholds_range
     
     def graph_metric(self, metric):
         """
         precision, recall, f1-score, accuracy
         """
-        if matric == "ROC":
+        if metric == "ROC":
             RocCurveDisplay.from_predictions(self.y_true, self.y_pred)
         
-        plt.plot(self.thresholds_range_x, self.thresholds_range[metric])
+        else:
+            plt.plot(self.thresholds_range_x, self.thresholds_range[metric])
