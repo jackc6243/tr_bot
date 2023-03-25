@@ -1,22 +1,105 @@
-def basic_cnn_binary(period):
+#data essentials
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+import math
+
+#self created tools
+from getting_data import *
+from Indicators import *
+from y_engineering import *
+from metric import *
+from models import *
+
+# PyTorch model and training necessities
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+import torch.optim as optim
+from torch.utils.data import Dataset, DataLoader
+
+#sklearn
+from sklearn.metrics import *
+
+#visualisation with tensorboard
+from torch.utils.tensorboard import SummaryWriter
+
+
+
+def train_loop(dataloader, model, loss_fn, optimizer):
+    size = len(dataloader.dataset)
+    total_loss = 0
+    model.train(True)
+    
+    for batch, (X, y) in enumerate(dataloader):
         
-    inputs = tf.keras.Input(shape=(period,1,))
+        pred = model(X)
+        loss = loss_fn(pred, y)
+        
+        total_loss += loss
+        
+        # Backpropagation
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
+
+        # if batch % 5 == 0:
+        #   loss, current = loss.item(), batch * len(X)
+        #   print(f"loss: {loss:>7f}  [{current:>5d}/{size:>5d}]")
     
-    # x = layers.Conv1D(16, kernel_size=5, strides=3, activation='relu')(inputs)
-    x = layers.Conv1D(8, kernel_size=3, strides=1, activation='relu')(inputs)
-    x = layers.Conv1D(1, kernel_size=1, strides=1, activation='relu')(x)
+    model.train(False)
     
-    # x = layers.LSTM(16, return_sequences=True, return_state=True)(x)
-    x = layers.LSTM(16, return_sequences=False, return_state=False)(x)
+    print(f"Avg training loss: {total_loss/size:>8f}", end=', ')
+    return total_loss/size
+
+
+def test_loop(dataloader, model, loss_fn, batch_size, threshold=0.5):
+    batch_num = len(dataloader.dataset)
+    test_loss, correct, tot = 0, 0, 0
+
+    with torch.no_grad():
+        for X, y in dataloader:
+            pred = model(X)
+            test_loss += loss_fn(pred, y).item()
+            pred = (torch.sigmoid(pred) > threshold).type(torch.float32)
+            correct += (pred==y).sum().item()
+            tot += y.shape[0]
+            
+    test_loss /= batch_num
+    correct /= tot
+    print(f"Avg val loss: {test_loss:>8f}, Validation accuracy: {(100*correct):>0.1f}% \n")
+    return test_loss, correct
+
+
+class basic_indicator_cnn(nn.Module):
+    def __init__(self):
+        super(indicator_cnn, self).__init__()
+        self.conv1 = nn.Conv1d(in_channels=3, out_channels=6, kernel_size=5, stride=1, padding=0)
+        self.conv2 = nn.Conv1d(6, 16, 3)
+        self.fc1 = nn.Linear(16 * 8, 64)
+        self.fc2 = nn.Linear(64, 32)
+        self.fc3 = nn.Linear(32, 1)
     
-    x = tf.keras.layers.Dense(32)(x)
-    x = tf.keras.layers.Dense(8)(x)
-    outputs = tf.keras.layers.Dense(1)(x)
+    def forward(self, x):
+        x = F.relu(self.conv1(x))
+        x = F.relu(self.conv2(x))
+        x = x.view(-1, num_flat_features(self, x))
+        x = F.relu(self.fc1(x))
+        x = F.relu(self.fc2(x))
+        x = self.fc3(x)
+        return x
     
-    model = keras.Model(inputs, outputs) 
+    def predict(self, x, return_logits=True, threshold = 0.5):
+        temp = self.forward(x).numpy()
+        logits = 1/(1 + np.exp(-temp))
+        if return_logits:
+            return logits
+        return (l > threshold).astype("int")
     
-    model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=1e-3),
-            loss=tf.keras.losses.BinaryCrossentropy(from_logits=True),
-            metrics=[tf.keras.metrics.binary_accuracy])
-    
-    return model
+    def num_flat_features(self, x):
+        size = x.size()[1:]
+        num_features = 1
+        for s in size:
+            num_features *= s
+        return num_features
+
