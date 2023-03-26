@@ -46,6 +46,7 @@ def get_xy(df, period, x_col = ['pct'], y_col='pct', val_pct=0.2, val_period=Non
     
     period: how long we want the x values to go back
     x_col: all columns of potential features
+    y_col: what y_true is
     
     """
     period_to_skip = period_to_skip if period_to_skip!=None else period+1
@@ -69,7 +70,6 @@ def get_xy(df, period, x_col = ['pct'], y_col='pct', val_pct=0.2, val_period=Non
             temp = np.array(get_x(df, val_i, x_col = x_column, period=period))
             x_val[i, j, :] = temp
 
-    # return np.squeeze(x_train), y_train, np.squeeze(x_val), y_val
     return x_train, np.expand_dims(y_train,1), x_val, np.expand_dims(y_val,1)
 
 
