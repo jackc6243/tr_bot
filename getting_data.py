@@ -73,6 +73,33 @@ def get_xy(df, period, x_col = ['pct'], y_col='pct', val_pct=0.2, val_period=Non
     return x_train, np.expand_dims(y_train,1), x_val, np.expand_dims(y_val,1)
 
 
+
+def get_concatenated_xy(data, period=14, x_cols = [["pct_log"], ['ema_pct_20',"ema_pct_200", "rsi_20"]], y_col='y_binary_sma4', val_pct=0.2, period_to_skip=40):
+    """
+    takes in a dictionary data of all the different stocks and returns a concatenated form
+    """
+    
+    x_train_concatenated = [ [] for _ in range(len(x_cols)) ]
+    x_val_concatenated = [ [] for _ in range(len(x_cols)) ]
+    y_train_concatenated = []
+    y_val_concatenated = []
+    
+    for key, df in data.items():
+        for i, x_col in enumerate(x_cols):
+            temp = get_xy(df, period, x_col = x_col, y_col=y_col, val_pct=val_pct, period_to_skip=period_to_skip)
+            x_train, y_train, x_val, y_val = convert_to_tensor(temp)
+            
+            x_train_concatenated[i].append(x_train)
+            x_val_concatenated[i].append(x_val)
+            
+            
+            if i == 0:
+                y_train_concatenated.append(y_train)
+                y_val_concatenated.append(y_val)
+                
+    return [torch.cat(x) for x in x_train_concatenated], [torch.cat(x) for x in x_val_concatenated], torch.cat(y_train_concatenated), torch.cat(y_val_concatenated)
+
+
 class CustomDataset(Dataset):
     """
     Custom dataset for pytorch
