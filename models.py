@@ -106,3 +106,4 @@ class basic_indicator_cnn(nn.Module):
             num_features *= s
         return num_features
 
+
